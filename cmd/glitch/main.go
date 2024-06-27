@@ -1,12 +1,13 @@
 package main
 
 import (
-	"chaos"
 	"flag"
 	"fmt"
 	"image/gif"
 	"log"
 	"os"
+
+	"github.com/cyberworm-uk/chaos"
 )
 
 func fname(roots, width int, prop, fuzz float64) string {
