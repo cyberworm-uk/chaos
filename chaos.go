@@ -5,12 +5,44 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/color/palette"
 	"image/gif"
 	"log"
 	"math"
 	"math/rand"
 )
+
+var transparent, blue, green, cyan, red, magenta, yellow, white = color.RGBA{0, 0, 0, 0}, color.RGBA{0, 0, 255, 255}, color.RGBA{0, 255, 0, 255}, color.RGBA{0, 255, 255, 255}, color.RGBA{255, 0, 0, 255}, color.RGBA{255, 0, 255, 255}, color.RGBA{255, 255, 0, 255}, color.RGBA{255, 255, 255, 255}
+
+var myPalette color.Palette = color.Palette{
+	transparent,
+	red,
+	green,
+	blue,
+	cyan,
+	magenta,
+	yellow,
+	white,
+}
+
+func myPaletted(r image.Rectangle) *image.Paletted {
+	img := image.NewPaletted(r, myPalette)
+	for x := r.Min.X; x < r.Max.X; x++ {
+		for y := r.Min.Y; y < r.Max.Y; y++ {
+			img.Set(x, y, myPalette[0])
+		}
+	}
+	return img
+}
+
+func myRGBA(r image.Rectangle) *image.RGBA {
+	img := image.NewRGBA(r)
+	for x := r.Min.X; x < r.Max.X; x++ {
+		for y := r.Min.Y; y < r.Max.Y; y++ {
+			img.Set(x, y, myPalette[0])
+		}
+	}
+	return img
+}
 
 type Chaos struct {
 	fuzz       float64
@@ -20,7 +52,7 @@ type Chaos struct {
 }
 
 func NewChaos(n int, prop float64, fuzz float64) (*Chaos, error) {
-	var roots, e = unity(n)
+	var roots, e = unity(n, fuzz)
 	if e != nil {
 		return &Chaos{}, e
 	}
@@ -71,13 +103,14 @@ func (c *Chaos) String() string {
 	return fmt.Sprintf("roots: %v, proportion: %v, fuzz: %v", c.roots, c.proportion, c.fuzz)
 }
 
-func unity(n int) ([]complex128, error) {
+func unity(n int, fuzz float64) ([]complex128, error) {
 	var out = []complex128{}
 	if n < 3 {
-		return out, errors.New("bad roots of unity (<3)")
+		return out, errors.New("bad number of roots of unity, must be 3 or more")
 	}
 	for i := 0; i < n; i++ {
 		var θ = math.Pi * 2 * float64(i) / float64(n)
+		θ += rand.Float64() * math.Pi * 2 * fuzz
 		var root = complex(math.Cos(θ), math.Sin(θ))
 		out = append(out, root)
 	}
@@ -103,7 +136,7 @@ func proportion(n int, prop float64) complex128 {
 }
 
 func frame(width, steps int, last *image.Paletted, c *Chaos, shade color.Color, extend bool) *image.Paletted {
-	var raw = image.NewPaletted(last.Bounds(), palette.WebSafe)
+	var raw = myPaletted(last.Bounds())
 	if extend {
 		copy(raw.Pix, last.Pix)
 	}
@@ -122,18 +155,20 @@ func RevealChaos(width, n, frames, steps int, prop float64, fuzz float64) (*gif.
 		Image:     []*image.Paletted{},
 		Delay:     []int{},
 		LoopCount: 0,
+		Disposal:  []byte{},
 	}
 	var c, e = NewChaos(n, prop, fuzz)
 	if e != nil {
 		return nil, e
 	}
 	log.Printf("%s\n", c)
-	var f = image.NewPaletted(image.Rectangle{image.Point{0, 0}, image.Point{width, width}}, palette.WebSafe)
+	var f = myPaletted(image.Rectangle{image.Point{0, 0}, image.Point{width, width}})
 	for i := 1; i <= frames; i++ {
 		f = frame(width, steps, f, c, color.White, true)
 		log.Printf("Frame: %v of %v\n", i, frames)
 		g.Image = append(g.Image, f)
 		g.Delay = append(g.Delay, 10)
+		g.Disposal = append(g.Disposal, gif.DisposalBackground)
 	}
 	return g, nil
 }
@@ -149,26 +184,28 @@ func ResolveChaos(width, n, steps int, props, prope, propi float64, fuzz float64
 		Image:     []*image.Paletted{},
 		Delay:     []int{},
 		LoopCount: 0,
+		Disposal:  []byte{},
 	}
 	var c, e = NewChaos(n, props, fuzz)
 	if e != nil {
 		return nil, e
 	}
 	log.Printf("%s\n", c)
-	var f = image.NewPaletted(image.Rectangle{image.Point{0, 0}, image.Point{width, width}}, palette.WebSafe)
+	var f = myPaletted(image.Rectangle{image.Point{0, 0}, image.Point{width, width}})
 	for i := 1; i <= frames; i++ {
 		c.proportion += complex(propi, 0)
 		f = frame(width, steps, f, c, color.White, false)
 		log.Printf("Frame: %v of %v\n", i, frames)
 		g.Image = append(g.Image, f)
 		g.Delay = append(g.Delay, 10)
+		g.Disposal = append(g.Disposal, gif.DisposalBackground)
 		c.fuzzer()
 	}
 	return g, nil
 }
 
 func glitchFrame(width, steps int, last *image.Paletted, c *Chaos, shade color.Color, extend bool) *image.Paletted {
-	var raw = image.NewPaletted(last.Bounds(), palette.WebSafe)
+	var raw = myPaletted(last.Bounds())
 	if extend {
 		copy(raw.Pix, last.Pix)
 	}
@@ -177,9 +214,9 @@ func glitchFrame(width, steps int, last *image.Paletted, c *Chaos, shade color.C
 		var x, y int
 		x = int((real(pos) + 1) * float64(width) / 2)
 		y = int((imag(pos) + 1) * float64(width) / 2)
-		r0, g0, b0, a0 := raw.At(x, y).RGBA()
-		r1, g1, b1, a1 := shade.RGBA()
-		raw.Set(x, y, color.RGBA{uint8(r0 | r1), uint8(g0 | g1), uint8(b0 | b1), uint8(a0 | a1)})
+		r0, g0, b0, _ := raw.At(x, y).RGBA()
+		r1, g1, b1, _ := shade.RGBA()
+		raw.Set(x, y, color.RGBA{uint8(r0 | r1), uint8(g0 | g1), uint8(b0 | b1), 255})
 	}
 	return raw
 }
@@ -189,29 +226,31 @@ func GlitchChaos(width, n, frames, steps int, prop float64, fuzz float64) (*gif.
 		Image:     []*image.Paletted{},
 		Delay:     []int{},
 		LoopCount: 0,
+		Disposal:  []byte{},
 	}
 	var c, e = NewChaos(n, prop, fuzz)
 	if e != nil {
 		return nil, e
 	}
 	log.Printf("%s\n", c)
-	var f = image.NewPaletted(image.Rectangle{image.Point{0, 0}, image.Point{width, width}}, palette.WebSafe)
+	var f = myPaletted(image.Rectangle{image.Point{0, 0}, image.Point{width, width}})
 	for i := 1; i <= frames; i++ {
-		f = glitchFrame(width, rand.Intn(steps), f, c, color.RGBA{255, 0, 0, 0}, false)
+		f = glitchFrame(width, rand.Intn(steps), f, c, color.RGBA{255, 0, 0, 255}, false)
 		c.fuzzer()
-		f = glitchFrame(width, rand.Intn(steps), f, c, color.RGBA{0, 255, 0, 0}, true)
+		f = glitchFrame(width, rand.Intn(steps), f, c, color.RGBA{0, 255, 0, 255}, true)
 		c.fuzzer()
-		f = glitchFrame(width, rand.Intn(steps), f, c, color.RGBA{0, 0, 255, 0}, true)
+		f = glitchFrame(width, rand.Intn(steps), f, c, color.RGBA{0, 0, 255, 255}, true)
 		c.fuzzer()
 		log.Printf("Frame: %v of %v\n", i, frames)
 		g.Image = append(g.Image, f)
 		g.Delay = append(g.Delay, 10)
+		g.Disposal = append(g.Disposal, gif.DisposalBackground)
 	}
 	return g, nil
 }
 
 func CrispChaos(width, n, steps int, prop float64, fuzz float64) (*image.RGBA, error) {
-	var raw = image.NewRGBA(image.Rectangle{image.Point{0, 0}, image.Point{width, width}})
+	var raw = myRGBA(image.Rectangle{image.Point{0, 0}, image.Point{width, width}})
 	var c, e = NewChaos(n, prop, fuzz)
 	if e != nil {
 		return nil, e
