@@ -11,7 +11,7 @@ import (
 	"math/rand"
 )
 
-var transparent, blue, green, cyan, red, magenta, yellow, white = color.RGBA{0, 0, 0, 0}, color.RGBA{0, 0, 255, 255}, color.RGBA{0, 255, 0, 255}, color.RGBA{0, 255, 255, 255}, color.RGBA{255, 0, 0, 255}, color.RGBA{255, 0, 255, 255}, color.RGBA{255, 255, 0, 255}, color.RGBA{255, 255, 255, 255}
+var transparent, blue, green, cyan, red, magenta, yellow, white, black = color.RGBA{0, 0, 0, 0}, color.RGBA{0, 0, 255, 255}, color.RGBA{0, 255, 0, 255}, color.RGBA{0, 255, 255, 255}, color.RGBA{255, 0, 0, 255}, color.RGBA{255, 0, 255, 255}, color.RGBA{255, 255, 0, 255}, color.RGBA{255, 255, 255, 255}, color.RGBA{0, 0, 0, 255}
 
 var myPalette color.Palette = color.Palette{
 	transparent,
@@ -22,6 +22,7 @@ var myPalette color.Palette = color.Palette{
 	magenta,
 	yellow,
 	white,
+	black,
 }
 
 func myPaletted(r image.Rectangle) *image.Paletted {
@@ -164,7 +165,7 @@ func RevealChaos(width, n, frames, steps int, prop float64, fuzz float64) (*gif.
 	log.Printf("%s\n", c)
 	var f = myPaletted(image.Rectangle{image.Point{0, 0}, image.Point{width, width}})
 	for i := 1; i <= frames; i++ {
-		f = frame(width, steps, f, c, color.White, true)
+		f = frame(width, steps, f, c, color.Black, true)
 		log.Printf("Frame: %v of %v\n", i, frames)
 		g.Image = append(g.Image, f)
 		g.Delay = append(g.Delay, 10)
@@ -194,7 +195,7 @@ func ResolveChaos(width, n, steps int, props, prope, propi float64, fuzz float64
 	var f = myPaletted(image.Rectangle{image.Point{0, 0}, image.Point{width, width}})
 	for i := 1; i <= frames; i++ {
 		c.proportion += complex(propi, 0)
-		f = frame(width, steps, f, c, color.White, false)
+		f = frame(width, steps, f, c, color.Black, false)
 		log.Printf("Frame: %v of %v\n", i, frames)
 		g.Image = append(g.Image, f)
 		g.Delay = append(g.Delay, 10)
